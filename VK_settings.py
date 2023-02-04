@@ -1,0 +1,6 @@
+VKbot_token = ""
+user_token = ""
+Api_version = ""
+db_name = ""
+db_user_name = ""
+db_password = ""
