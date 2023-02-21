@@ -33,12 +33,18 @@ def search_users(sex, age, city, user_id):
                             'hometown': city
                             })
         for element in response['items']:
+            is_closed = vk.method('users.get',
+                                {'user_ids': element['id'],
+                                'fields': 'is_closed'
+                                })
+            if is_closed[0]['is_closed']:
+                continue
             person = [
-                element['first_name'],
-                element['last_name'],
-                'https://vk.com/id' + str(element['id']),
-                element['id']
-            ]
+                    element['first_name'],
+                    element['last_name'],
+                    'https://vk.com/id' + str(element['id']),
+                    element['id']
+                    ]
             get_photo(person)
             if(len(person[4]) > 0 and not check_pair(user_id, int(person[3]))): 
                 all_persons.append(person)
@@ -47,21 +53,16 @@ def search_users(sex, age, city, user_id):
 def get_photo(person):
     vk = vk_api.VkApi(token=user_token)
     users_photos = []
-    try:
-        response = vk.method('photos.get',
-                              {
-                                  'access_token': user_token,
-                                  'v': Api_version,
-                                  'owner_id': person[3],
-                                  'album_id': 'profile',
-                                  'count': 10,
-                                  'extended': 1,
-                                  'photo_sizes': 1,
-                              })
-    except:
-        print("Profile is closed")
-        person.append([])
-        return 0
+    response = vk.method('photos.get',
+                            {
+                                'access_token': user_token,
+                                'v': Api_version,
+                                'owner_id': person[3],
+                                'album_id': 'profile',
+                                'count': 10,
+                                'extended': 1,
+                                'photo_sizes': 1,
+                            })
     if len(response['items']) > 3:
         for i in range(len(response['items'])):
             users_photos.append(
@@ -121,17 +122,13 @@ def get_search_params(user_id):
     return sex,age,city
 
 if __name__ == '__main__':
-    try:
-        vk = vk_api.VkApi(token=VKbot_token)
-    except:
-        print("Enable to connect to VKapi")
-    try:    
-        run_db()
-    except:
-        print("Enable to connect to DB")
+    vk = vk_api.VkApi(token=VKbot_token)
+    run_db()
     while True:
         longpoll = VkLongPoll(vk)
         text, user_id = main_bot_loop()
+        if not is_user_registered(user_id):
+            user_registration(user_id)
         if text == 'начать':
             bot_send_msg(user_id, started_msg)
         sex, age, city = get_search_params(user_id)
