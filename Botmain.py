@@ -32,12 +32,24 @@ def search_users(sex, age, city, user_id):
                             'online': 1,
                             'hometown': city
                             })
-        for element in response['items']:
+        try:
+            response = response['items']
+        except KeyError:
+            print("Ошибка в ответе users.search")
+            bot_send_msg(user_id, "Извините, произошла ошибка, повторите попытку позднее")
+            return None
+        for element in response:
             is_closed = vk.method('users.get',
                                 {'user_ids': element['id'],
                                 'fields': 'is_closed'
                                 })
-            if is_closed[0]['is_closed']:
+            try:
+                is_closed = is_closed[0]['is_closed']
+            except KeyError:
+                print("Ошибка в ответе users.get")
+                bot_send_msg(user_id, "Извините, произошла ошибка, повторите попытку позднее")
+                return None
+            if is_closed:
                 continue
             person = [
                     element['first_name'],
@@ -45,12 +57,13 @@ def search_users(sex, age, city, user_id):
                     'https://vk.com/id' + str(element['id']),
                     element['id']
                     ]
-            get_photo(person)
+            if get_photo(person, user_id) is None:
+                return None
             if(len(person[4]) > 0 and not check_pair(user_id, int(person[3]))): 
                 all_persons.append(person)
     return all_persons
 
-def get_photo(person):
+def get_photo(person, user_id):
     vk = vk_api.VkApi(token=user_token)
     users_photos = []
     response = vk.method('photos.get',
@@ -63,13 +76,20 @@ def get_photo(person):
                                 'extended': 1,
                                 'photo_sizes': 1,
                             })
-    if len(response['items']) > 3:
-        for i in range(len(response['items'])):
+    try:
+        response = response['items']
+    except KeyError:
+        print("Ошибка в ответе photos.get")
+        bot_send_msg(user_id, "Извините, произошла ошибка, повторите попытку позднее")
+        return None
+    if len(response) > 3:
+        for i in range(len(response)):
             users_photos.append(
-                [response['items'][i]['likes']['count'] + response['items'][i]['comments']['count'],
-                    'photo' + str(response['items'][i]['owner_id']) + '_' + str(response['items'][i]['id'])])
+                [response[i]['likes']['count'] + response[i]['comments']['count'],
+                    'photo' + str(response[i]['owner_id']) + '_' + str(response[i]['id'])])
         users_photos.sort(reverse=True, key=lambda x: x[0])
         person.append(users_photos[:3])
+        return 0
     else:
         print("Недостаточно фото для выдачи")
         person.append([])
@@ -84,7 +104,13 @@ def get_search_params(user_id):
     response = vk.method('users.get',
                     {'user_ids': user_id,
                      'fields': 'sex, bdate, city'
-                    })[0]
+                    })
+    try:
+        response = response[0]
+    except:
+        print("Ошибка в ответе users.get")
+        bot_send_msg(user_id, "Извините, произошла ошибка, повторите попытку позднее")
+        return None
     if 'sex' in response:
         if response['sex'] == 1:
             sex = 2
@@ -131,9 +157,18 @@ if __name__ == '__main__':
             user_registration(user_id)
         if text == 'начать':
             bot_send_msg(user_id, started_msg)
-        sex, age, city = get_search_params(user_id)
+        search_params = get_search_params(user_id)
+        if search_params is None:
+            continue
+        else:
+            sex = search_params[0]
+            age = search_params[1]
+            city = search_params[2]
         bot_send_msg(user_id, "Выполняю поиск подходящих анкет, подождите")
-        for person in search_users(sex,age,city, user_id):
+        found_users = search_users(sex,age,city, user_id)
+        if found_users is None:
+            continue
+        for person in found_users:
             bot_send_msg(user_id,f'\n{person[0]}  {person[1]}  {person[2]}',)
             bot_send_msg(user_id, f'фото:',attachment=','.join([person[4][0][1],person[4][1][1],person[4][2][1]]))
             add_pair(user_id,person[3])
